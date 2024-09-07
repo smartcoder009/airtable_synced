@@ -1,0 +1,10 @@
+{
+  "dependencies": {
+    "airtable": "^0.12.2",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "ws": "^8.18.0",
+    "y-websocket": "^2.0.4"
+  }
+}
