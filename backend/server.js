@@ -21,7 +21,7 @@ const base = new Airtable({apiKey: process.env.AIRTABLE_API_KEY}).base(process.e
 async function handleConnection(ws, req, table, recordId, view) {
     if (req.url === `/${recordId}`) {
       setupWSConnection(ws, req, { docName: `room-${recordId}` });
-  
+      console.log('sss');
       try {
         const bundledData = await bundleAirtableData(table, recordId, view);
         ws.send(JSON.stringify(bundledData));
@@ -29,9 +29,28 @@ async function handleConnection(ws, req, table, recordId, view) {
       } catch (error) {
         console.error('Error sending bundled data:', error);
       }
-    }
+    } 
 }
-  
+
+async function countRecords(table) {
+  return new Promise((resolve, reject) => {
+    let recordCount = [];
+    base(table).select({}).eachPage(
+      (records, fetchNextPage) => {
+        recordCount += records.length; // Count records on each page
+        fetchNextPage();
+      },
+      (err) => {
+        if (err) {
+          reject(err);
+          return;
+        }
+        resolve(recordCount); // Resolve with the total count
+      }
+    );
+  });
+}
+
 // Fetch all records and set up WebSocket channels per record
 async function setupAllRecordChannels(table,view) {
     base(table).select().eachPage(async (records, fetchNextPage) => {
@@ -42,6 +61,20 @@ async function setupAllRecordChannels(table,view) {
         wss.on('connection', (ws, req) => {
           // Use the helper function to handle the connection asynchronously
           handleConnection(ws, req, table, recordId, view);
+          ws.on('message', async (message) => {
+            try {
+              const data = JSON.parse(message);
+              
+              // Check if the message is a request for record count
+              if (data.type === 'getCount') {
+                const count = await countRecords(table);
+                ws.send(JSON.stringify({ type: 'countResponse', count }));
+              }
+            } catch (error) {
+              console.error('Error handling WebSocket message:', error);
+              ws.send(JSON.stringify({ type: 'error', message: 'Error processing your request.' }));
+            }
+          });
         });
       }
   
